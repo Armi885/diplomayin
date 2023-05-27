@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
@@ -11,7 +12,7 @@ import 'package:dotted_border/dotted_border.dart';
 import 'DiplomaCAPI.dart';
 
 void main() {
-  DiplomaCAPI f = DiplomaCAPI();
+  // DiplomaCAPI f = DiplomaCAPI();
   runApp(MyApp());
 }
 
@@ -31,9 +32,21 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  String imageDimensions = '';
+
+  Color _backgroundColor = const Color.fromRGBO(248, 249, 252, 1);
+  bool isShow = false;
+
+  String? _selectedOption;
+  @override
+  void initState() {
+    super.initState();
+    _selectedOption = 'High Quality (Recommend)';
+  }
+
   bool _dragging = false;
 
-  final List<XFile> _imageFiles = [];
+  List<XFile> _imageFiles = [];
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +61,7 @@ class _MyHomePageState extends State<MyHomePage> {
               padding: const EdgeInsets.all(50.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text('Compressor',
                       style: TextStyle(
@@ -65,7 +78,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           children: [
                             Row(
                               children: [
-                                const Text('Attach Image'),
+                                const Text('Attach file'),
                                 IconButton(
                                     onPressed: () async {
                                       final files = await FilePicker.platform
@@ -74,7 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                       for (var platformFile in files.files) {
                                         setState(() {
                                           _imageFiles
-                                              .add(platformFile as XFile);
+                                              .add(XFile(platformFile.path!));
                                         });
                                       }
                                     },
@@ -87,6 +100,8 @@ class _MyHomePageState extends State<MyHomePage> {
                               _buildDropTarget()
                             else
                               _buildCompressor(),
+                            const Divider(),
+                            _buildButtonsRow()
                           ],
                         ),
                       ),
@@ -97,6 +112,56 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           ),
         ));
+  }
+
+  Row _buildButtonsRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        const Flexible(
+            child: Text('Quality:',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+        Flexible(
+          child: RadioListTile(
+            title: const Text('Low Quality'),
+            value: 'Low Quality',
+            activeColor: const Color.fromRGBO(73, 126, 126, 1),
+            groupValue: _selectedOption,
+            onChanged: (value) {
+              setState(() {
+                _selectedOption = value;
+              });
+            },
+          ),
+        ),
+        Flexible(
+          child: RadioListTile(
+            title: const Text('Standard'),
+            value: 'Standard',
+            activeColor: const Color.fromRGBO(73, 126, 126, 1),
+            groupValue: _selectedOption,
+            onChanged: (value) {
+              setState(() {
+                _selectedOption = value;
+              });
+            },
+          ),
+        ),
+        Flexible(
+          child: RadioListTile(
+            title: const Text('High Quality (Recommend)'),
+            value: 'High Quality (Recommend)',
+            activeColor: const Color.fromRGBO(73, 126, 126, 1),
+            groupValue: _selectedOption,
+            onChanged: (value) {
+              setState(() {
+                _selectedOption = value;
+              });
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   String getImageName(XFile imageFile) {
@@ -121,99 +186,222 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   _buildCompressor() {
-    return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Container(
-        color: const Color.fromRGBO(247, 249, 252, 1),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(5.0),
-                child: Image.file(
-                  height: 170,
-                  width: 150,
-                  File(_imageFiles[0].path),
-                  fit: BoxFit.fill,
+    return MouseRegion(
+      onEnter: (event) => _removeImage(true),
+      onExit: (event) => _removeImage(false),
+      child: Padding(
+        padding: const EdgeInsets.all(15.0),
+        child: Container(
+          color: const Color.fromRGBO(247, 249, 252, 1),
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5.0),
+                  child: SizedBox(
+                    width: 120, // Set a specific width for the container
+                    height: 120,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9, // Set the desired aspect ratio here
+
+                      child: Image.file(
+                        // height: 120,
+                        // width: 120,
+                        File(_imageFiles[0].path),
+                        fit: BoxFit.fill,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                          getImageName(
-                            _imageFiles[0],
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                            getImageName(
+                              _imageFiles[0],
+                            ),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500, fontSize: 16)),
+                        const SizedBox(height: 20),
+                        DottedBorder(
+                          borderType: BorderType.RRect,
+                          // radius: const Radius.circular(12),
+                          dashPattern: const [6, 3, 2, 3],
+                          //224,229,238
+                          color: const Color.fromRGBO(224, 229, 238, 1),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10.0, horizontal: 8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.folder,
+                                      color: Color.fromRGBO(73, 126, 126, 1),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                        getImageFileSizeInMB(
+                                          _imageFiles[0],
+                                        ),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: 16)),
+                                  ],
+                                ),
+                                Row(
+                                  children: [
+                                    const CircleAvatar(
+                                      radius: 2,
+                                      backgroundColor: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(getFileExtension(_imageFiles[0].name)),
+                                    const SizedBox(width: 20),
+                                    const CircleAvatar(
+                                      radius: 2,
+                                      backgroundColor: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(_getImageDimensions()),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w500, fontSize: 16)),
-                      const SizedBox(height: 20),
-                      DottedBorder(
-                        borderType: BorderType.RRect,
-                        // radius: const Radius.circular(12),
-                        dashPattern: const [6, 3, 2, 3],
-                        //224,229,238
-                        color: const Color.fromRGBO(224, 229, 238, 1),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 18.0, horizontal: 8),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.folder,
-                                    color: Color.fromRGBO(73, 126, 126, 1),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                      getImageFileSizeInMB(
-                                        _imageFiles[0],
-                                      ),
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 16)),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  const CircleAvatar(
-                                    radius: 2,
-                                    backgroundColor: Colors.black,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(getFileExtension(_imageFiles[0].name)),
-                                  // Text( getImageDimensions(File((_imageFiles[0].path))),
-                                ],
-                              ),
-                            ],
+                        ),
+                      ]),
+                ),
+                const Spacer(),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isShow)
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return MyAlertDialog();
+                              },
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: const InkResponse(
+                              containedInkWell: true,
+                              child: Icon(Icons.close, color: Colors.grey)),
+                        ),
+                      )
+                    else
+                      Container(),
+                    Padding(
+                      padding: isShow
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.only(top: 25.0),
+                      child: Center(
+                        child: ElevatedButton(
+                          style: ButtonStyle(
+                            backgroundColor: MaterialStateProperty.all<Color>(
+                                const Color.fromRGBO(73, 126, 126, 1)),
+                          ),
+                          onPressed: () {},
+                          child: const Padding(
+                            padding: EdgeInsets.all(8.0),
+                            child: Text('Compress'),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color.fromRGBO(73, 126, 126, 1),
-                              shape: const StadiumBorder()),
-                          child: const Text('Compress'),
-                        ),
-                      )
-                    ]),
-              )
-            ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  String _getImageDimensions() {
+    File image = File(_imageFiles[0].path);
+    decodeImageFromList(image.readAsBytesSync()).then((value) {
+      setState(() {
+        imageDimensions = '${value.height} * ${value.width}';
+      });
+    });
+    return imageDimensions;
+  }
+
+  void _onHover(bool isHovered) {
+    setState(() {
+      _backgroundColor = isHovered
+          ? const Color.fromRGBO(242, 244, 248, 1)
+          : const Color.fromRGBO(248, 249, 252, 1);
+    });
+  }
+
+  void _removeImage(bool isRemoved) {
+    setState(() {
+      isShow = isRemoved;
+    });
+  }
+
+  MyAlertDialog() {
+    return AlertDialog(
+      title: const Text('Information'),
+      content: StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                children: const [
+                  Icon(Icons.info, color: Color.fromRGBO(73, 126, 126, 1)),
+                  SizedBox(width: 4),
+                  Text('Are you sure you want to remove this selected item?'),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+      actions: <Widget>[
+        TextButton(
+          style: ButtonStyle(
+            foregroundColor: MaterialStateProperty.all<Color>(
+                const Color.fromRGBO(73, 126, 126, 1)),
+          ),
+          child: const Text('Cancel'),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
+        TextButton(
+          style: ButtonStyle(
+            foregroundColor: MaterialStateProperty.all<Color>(
+                const Color.fromARGB(255, 239, 44, 30)),
+          ),
+          child: const Text('Remove'),
+          onPressed: () {
+            setState(() {
+              _imageFiles = [];
+            });
+            // Perform submit action
+            Navigator.of(context).pop();
+          },
+        ),
+      ],
     );
   }
 
@@ -234,66 +422,91 @@ class _MyHomePageState extends State<MyHomePage> {
           _dragging = false;
         });
       },
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: ClipRect(
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: DottedBorder(
-              borderType: BorderType.RRect,
-              radius: const Radius.circular(12),
-              dashPattern: const [6, 3, 2, 3],
-              color: const Color.fromRGBO(222, 227, 238, 1),
-              strokeWidth: 2,
-              child: Container(
-                  height: 250,
-                  width: 500,
-                  color: _dragging
-                      ? Colors.blue.withOpacity(0.4)
-                      : const Color.fromRGBO(248, 249, 252, 1),
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.cloud_download,
-                            size: 64, color: Color.fromRGBO(73, 126, 126, 1)),
-                        const Text('Add or drag file here to start compression',
-                            style: TextStyle(
-                                color: Color.fromRGBO(72, 72, 82, 1))),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 8.0),
-                          child: Divider(),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 18.0),
-                          child: Row(
-                            children: const [
-                              Text('Step 1: Add ',
-                                  style: TextStyle(
-                                      color: Color.fromRGBO(72, 72, 82, 1))),
-                              SizedBox(width: 8),
-                              Icon(Icons.file_upload_outlined,
-                                  color: Color.fromRGBO(73, 126, 126, 1)),
-                              SizedBox(width: 8),
-                              Text('or drag file here to start compression.',
-                                  style: TextStyle(
-                                      color: Color.fromRGBO(72, 72, 82, 1))),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 18.0),
-                          child: Row(
-                            children: const [
-                              Text('Step 2: Start compression.',
-                                  style: TextStyle(
-                                      color: Color.fromRGBO(72, 72, 82, 1))),
-                            ],
-                          ),
-                        )
-                      ])),
+      child: MouseRegion(
+        onEnter: (event) => _onHover(true),
+        onExit: (event) => _onHover(false),
+        child: GestureDetector(
+          onTap: () async {
+            final files =
+                await FilePicker.platform.pickFiles(allowMultiple: true);
+            if (files == null) return;
+            for (var platformFile in files.files) {
+              setState(() {
+                _imageFiles.add(XFile(platformFile.path!));
+              });
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(30.0),
+            child: ClipRect(
+              child: Card(
+                color: _backgroundColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: DottedBorder(
+                  borderType: BorderType.RRect,
+                  radius: const Radius.circular(12),
+                  dashPattern: const [6, 3, 2, 3],
+                  color: const Color.fromRGBO(222, 227, 238, 1),
+                  strokeWidth: 2,
+                  child: Container(
+                      height: 250,
+                      width: 500,
+                      color: _dragging
+                          ? Colors.blue.withOpacity(0.4)
+                          : _backgroundColor,
+
+                      // const Color.fromRGBO(248, 249, 252, 1),
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.cloud_download,
+                                size: 64,
+                                color: Color.fromRGBO(73, 126, 126, 1)),
+                            const Text(
+                                'Add or drag file here to start compression',
+                                style: TextStyle(
+                                    color: Color.fromRGBO(72, 72, 82, 1))),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8.0),
+                              child: Divider(),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 18.0),
+                              child: Row(
+                                children: const [
+                                  Text('Step 1: Add ',
+                                      style: TextStyle(
+                                          color:
+                                              Color.fromRGBO(72, 72, 82, 1))),
+                                  SizedBox(width: 8),
+                                  Icon(Icons.file_upload_outlined,
+                                      color: Color.fromRGBO(73, 126, 126, 1)),
+                                  SizedBox(width: 8),
+                                  Text(
+                                      'or drag file here to start compression.',
+                                      style: TextStyle(
+                                          color:
+                                              Color.fromRGBO(72, 72, 82, 1))),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 18.0),
+                              child: Row(
+                                children: const [
+                                  Text('Step 2: Start compression.',
+                                      style: TextStyle(
+                                          color:
+                                              Color.fromRGBO(72, 72, 82, 1))),
+                                ],
+                              ),
+                            )
+                          ])),
+                ),
+              ),
             ),
           ),
         ),
