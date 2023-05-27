@@ -6,6 +6,8 @@ import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as path;
 import 'package:image/image.dart' as img;
 
+import 'main.dart';
+
 typedef NativeMatPtr = ffi.IntPtr;
 typedef NativeSerializedDataPtr = ffi.IntPtr;
 
@@ -50,7 +52,8 @@ typedef compressSignature = NativeSerializedDataPtr Function(
 typedef compress_t = int Function(int matPtr, int m, int n, int p);
 
 class DiplomaCAPI {
-  DiplomaCAPI() {
+  int matImgDecompress = 0;
+  DiplomaCAPI({required String imagePath}) {
     var libraryPath = path.join(Directory.current.path, 'DNNCompression.dll');
     final dylib = ffi.DynamicLibrary.open(libraryPath);
 
@@ -103,10 +106,11 @@ class DiplomaCAPI {
     //   list.add(0);
     // }
 
-    String imagepath =
-        "C:\\Users\\ADMIN\\Downloads\\d8807dc1-2922-42ca-8aa7-ae91f4c4fdd9.png";
+    // String imagepath =
 
-    img.Image? image = img.decodeImage(File(imagepath).readAsBytesSync());
+    //     "C:\\Users\\ADMIN\\Downloads\\d8807dc1-2922-42ca-8aa7-ae91f4c4fdd9.png";
+
+    img.Image? image = img.decodeImage(File(imagePath).readAsBytesSync());
     if (image != null) {
       print(" img.decodeImage");
       const backwards = 'Before compression';
@@ -139,9 +143,16 @@ class DiplomaCAPI {
       destroyMat(matImg);
       matImg = 0;
 
-      matImg = deCompress(
-          compressedData); //createMatAndFill(500, 500, 3, intListToArray(list).address);
+      matImg = deCompress(compressedData);
+
+      print('compressedData:$compressedData');
+
+      //createMatAndFill(500, 500, 3, intListToArray(list).address);
+      print('matImg:$matImg');
+      matImgDecompress = matImg;
+
       imshow(backwardsUtf82, matImg);
+
       destroySerializedData(compressedData);
 
       calloc.free(backwardsUtf8);

@@ -10,6 +10,7 @@ import 'package:cross_file/cross_file.dart';
 import 'package:dotted_border/dotted_border.dart';
 
 import 'DiplomaCAPI.dart';
+import 'image_isolate.dart';
 
 void main() {
   // DiplomaCAPI f = DiplomaCAPI();
@@ -164,6 +165,12 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void updateUI() {
+    setState(() {
+      // Update your UI state here
+    });
+  }
+
   String getImageName(XFile imageFile) {
     return imageFile.name;
   }
@@ -315,7 +322,14 @@ class _MyHomePageState extends State<MyHomePage> {
                             backgroundColor: MaterialStateProperty.all<Color>(
                                 const Color.fromRGBO(73, 126, 126, 1)),
                           ),
-                          onPressed: () {},
+                          onPressed: () {
+                            DiplomCAPI decompress =
+                                DiplomCAPI(imagePath: _imageFiles[0].path);
+                            // DiplomaCAPI f =
+                            //     DiplomaCAPI(imagePath: _imageFiles[0].path);
+                            print('Decompress: ${decompress.matImgDecompress}');
+                            //    int a = f.uint8ListToArray(list);
+                          },
                           child: const Padding(
                             padding: EdgeInsets.all(8.0),
                             child: Text('Compress'),
