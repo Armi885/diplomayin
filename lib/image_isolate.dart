@@ -65,7 +65,7 @@ class DiplomCAPI {
       if (data is int) {
         print('The image succesfuly   decompressed');
         print('deCompressData:$data');
-        
+
       } else if (data is Uint8List) {
       } else {
         print('Error when image compressed');
@@ -174,7 +174,7 @@ void _isolate(SendPort sendPort) {
         calloc.free(backwardsUtf82);
         destroyMat(matImg);
       } else {
-        replyPort.send('Image decode error');
+        replyPort.send('Error Image decompress');
       }
     } catch (e) {
       replyPort.send(e.toString());

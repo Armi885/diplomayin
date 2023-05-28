@@ -2,6 +2,7 @@ import 'dart:ffi' as ffi;
 import 'dart:io' show Directory, File, Platform;
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as path;
 import 'package:image/image.dart' as img;
@@ -51,8 +52,18 @@ typedef compressSignature = NativeSerializedDataPtr Function(
     NativeMatPtr matPtr, ffi.Int32 m, ffi.Int32 n, ffi.Int32 p);
 typedef compress_t = int Function(int matPtr, int m, int n, int p);
 
+// __declspec(dllexport) void DiplomaCompressorCApi_getMatParams(ApiMat, int* cols, int* rows, int* channels, int* dataSize);
+typedef getMatParamsSignature = ffi.Void Function(NativeMatPtr matPtr,
+    ffi.IntPtr cols, ffi.IntPtr rows, ffi.IntPtr channels, ffi.IntPtr dataSize);
+typedef getMatParams_t = void Function(
+    int matPtr, int colsPtr, int rowsPtr, int channelsPtr, int dataSizePtr);
+
+// __declspec(dllexport) void DiplomaCompressorCApi_getMatData(ApiMat,char*);
+typedef getMatDataSignature = ffi.Void Function(
+    NativeMatPtr matPtr, ffi.IntPtr dataPtr);
+typedef getMatData_t = void Function(int matPtr, int dataPtr);
+
 class DiplomaCAPI {
-  int matImgDecompress = 0;
   DiplomaCAPI({required String imagePath}) {
     var libraryPath = path.join(Directory.current.path, 'DNNCompression.dll');
     final dylib = ffi.DynamicLibrary.open(libraryPath);
@@ -71,6 +82,12 @@ class DiplomaCAPI {
         .lookup<ffi.NativeFunction<createMatAndFillSignature>>(
             'DiplomaCompressorCApi_createMatAndFill')
         .asFunction<createMatAndFill_t>();
+
+    final getMatParams_t getMatParams = dylib
+        .lookup<ffi.NativeFunction<getMatParamsSignature>>(
+            'DiplomaCompressorCApi_getMatParams')
+        .asFunction<getMatParams_t>();
+
     final imshow_t imshow = dylib
         .lookup<ffi.NativeFunction<imshowSignature>>(
             'DiplomaCompressorCApi_imshow')
@@ -99,6 +116,10 @@ class DiplomaCAPI {
         .lookup<ffi.NativeFunction<compressSignature>>(
             'DiplomaCompressorCApi_compress')
         .asFunction<compress_t>();
+    final getMatData_t getMatData = dylib
+        .lookup<ffi.NativeFunction<getMatDataSignature>>(
+            'DiplomaCompressorCApi_getMatData')
+        .asFunction<getMatData_t>();
     // List<int> list = [];
     // for (int i = 0; i < 500 * 500; ++i) {
     //   list.add(255);
@@ -112,7 +133,6 @@ class DiplomaCAPI {
 
     img.Image? image = img.decodeImage(File(imagePath).readAsBytesSync());
     if (image != null) {
-      print(" img.decodeImage");
       const backwards = 'Before compression';
       final backwardsUtf8 = backwards.toNativeUtf8();
       const backwards2 = 'After decompression';
@@ -129,8 +149,7 @@ class DiplomaCAPI {
         pixelsRawList[index + 1] = pixel.g.toInt();
         pixelsRawList[index + 0] = pixel.b.toInt();
       }
-      print(
-          "pixelsRawList.length=${pixelsRawList.length} ${image.numChannels}");
+
       var rawNative = uint8ListToArray(pixelsRawList);
 
       var matImg = createMatAndFill(
@@ -145,12 +164,54 @@ class DiplomaCAPI {
 
       matImg = deCompress(compressedData);
 
-      print('compressedData:$compressedData');
-
       //createMatAndFill(500, 500, 3, intListToArray(list).address);
-      print('matImg:$matImg');
-      matImgDecompress = matImg;
+      ffi.Pointer<ffi.Int32> colsPtr =
+          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      ffi.Pointer<ffi.Int32> rowsPtr =
+          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
 
+      ffi.Pointer<ffi.Int32> channelsPtr =
+          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+
+      ffi.Pointer<ffi.Int32> dataSizePtr =
+          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+      {
+        getMatParams(matImg, colsPtr.address, rowsPtr.address,
+            channelsPtr.address, dataSizePtr.address);
+
+        int cols = colsPtr.value;
+        int rows = rowsPtr.value;
+        int channels = channelsPtr.value;
+        int dataSize = dataSizePtr.value;
+
+        malloc.free(colsPtr);
+        malloc.free(rowsPtr);
+        malloc.free(channelsPtr);
+        malloc.free(dataSizePtr);
+
+        ffi.Pointer<ffi.Int8> imgDataPtr =
+            malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * dataSize);
+        getMatData(matImg, imgDataPtr.address);
+
+        img.Image image =
+            img.Image(height: rows, width: cols, numChannels: channels);
+        for (int y = 0; y < rows; ++y) {
+          for (int x = 0; x < cols; ++x) {
+            img.Color c = img.ColorInt8(channels);
+            for (int i = 0; i < channels; ++i) {
+              c[i] = imgDataPtr
+                  .elementAt(y * (cols * channels) + (x * channels) + i)
+                  .value;
+            }
+            image.setPixel(x, y, c);
+          }
+        }
+        malloc.free(imgDataPtr);
+        img.PngEncoder encoder = img.PngEncoder();
+        Uint8List pngBytes = encoder.encode(image);
+        File f = File("C:/Users/ADMIN/Desktop/testing/out.png");
+        f.writeAsBytes(pngBytes);
+      }
       imshow(backwardsUtf82, matImg);
 
       destroySerializedData(compressedData);
@@ -196,6 +257,3 @@ class DiplomaCAPI {
 // __declspec(dllexport) void DiplomaCompressorCApi_getDataFromSerializedData(SerializedData serializedData,char* data);
 // __declspec(dllexport) void DiplomaCompressorCApi_setDataToSerializedData(int size, char* data, SerializedData);
 // __declspec(dllexport) void DiplomaCompressorCApi_destroySerializedData(SerializedData);
-class DiplomaCAPI_Mat {}
-
-class DiplomaCAPI_SerialziedData {}

@@ -166,9 +166,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void updateUI() {
-    setState(() {
-      // Update your UI state here
-    });
+    setState(() {});
   }
 
   String getImageName(XFile imageFile) {
@@ -321,17 +319,23 @@ class _MyHomePageState extends State<MyHomePage> {
                           style: ButtonStyle(
                             backgroundColor: MaterialStateProperty.all<Color>(
                                 const Color.fromRGBO(73, 126, 126, 1)),
+                            shape: MaterialStateProperty.all<
+                                RoundedRectangleBorder>(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    10.0), // Adjust the value as per your preference
+                              ),
+                            ),
                           ),
                           onPressed: () {
-                            DiplomCAPI decompress =
-                                DiplomCAPI(imagePath: _imageFiles[0].path);
-                            // DiplomaCAPI f =
-                            //     DiplomaCAPI(imagePath: _imageFiles[0].path);
-                            print('Decompress: ${decompress.matImgDecompress}');
+                            // DiplomCAPI decompress =
+                            //     DiplomCAPI(imagePath: _imageFiles[0].path);
+                            DiplomaCAPI f =
+                                DiplomaCAPI(imagePath: _imageFiles[0].path);
                             //    int a = f.uint8ListToArray(list);
                           },
                           child: const Padding(
-                            padding: EdgeInsets.all(8.0),
+                            padding: EdgeInsets.all(20.0),
                             child: Text('Compress'),
                           ),
                         ),
