@@ -1,13 +1,9 @@
 import 'dart:ffi' as ffi;
-import 'dart:io' show Directory, File, Platform;
-import 'dart:math';
+import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as path;
 import 'package:image/image.dart' as img;
-
-import 'main.dart';
 
 typedef NativeMatPtr = ffi.IntPtr;
 typedef NativeSerializedDataPtr = ffi.IntPtr;
@@ -63,176 +59,191 @@ typedef getMatDataSignature = ffi.Void Function(
     NativeMatPtr matPtr, ffi.IntPtr dataPtr);
 typedef getMatData_t = void Function(int matPtr, int dataPtr);
 
+// __declspec(dllexport) int DiplomaCompressorCApi_sizeOfSerializedData(SerializedData);
+typedef sizeOfSerializedDataSignature = ffi.Int Function(
+    NativeSerializedDataPtr serDataPtr);
+typedef sizeOfSerializedData_t = int Function(int serDataPtr);
+
+// __declspec(dllexport) void DiplomaCompressorCApi_getDataFromSerializedData(SerializedData serializedData,char* data);
+typedef getDataFromSerializedDataSignature = ffi.Void Function(
+    NativeSerializedDataPtr serDatPtr, ffi.IntPtr dataPtr);
+typedef getDataFromSerializedData_t = void Function(int serDatPtr, int dataPtr);
+
 class DiplomaCAPI {
-  DiplomaCAPI({required String imagePath}) {
-    var libraryPath = path.join(Directory.current.path, 'DNNCompression.dll');
-    final dylib = ffi.DynamicLibrary.open(libraryPath);
+  late final ffi.DynamicLibrary _dylib = ffi.DynamicLibrary.open(
+      path.join(Directory.current.path, 'DNNCompression.dll'));
 
-    final createEmptyMat_t createEmptyMat = dylib
-        .lookup<ffi.NativeFunction<createEmptyMatSignature>>(
-            'DiplomaCompressorCApi_createEmptyMat')
-        .asFunction<createEmptyMat_t>();
+  late final createEmptyMat_t _createEmptyMat = _dylib
+      .lookup<ffi.NativeFunction<createEmptyMatSignature>>(
+          'DiplomaCompressorCApi_createEmptyMat')
+      .asFunction<createEmptyMat_t>();
 
-    final createMat_t createMat = dylib
-        .lookup<ffi.NativeFunction<createMatSignature>>(
-            'DiplomaCompressorCApi_createMat')
-        .asFunction<createMat_t>();
+  late final createMat_t _createMat = _dylib
+      .lookup<ffi.NativeFunction<createMatSignature>>(
+          'DiplomaCompressorCApi_createMat')
+      .asFunction<createMat_t>();
 
-    final createMatAndFill_t createMatAndFill = dylib
-        .lookup<ffi.NativeFunction<createMatAndFillSignature>>(
-            'DiplomaCompressorCApi_createMatAndFill')
-        .asFunction<createMatAndFill_t>();
+  late final createMatAndFill_t _createMatAndFill = _dylib
+      .lookup<ffi.NativeFunction<createMatAndFillSignature>>(
+          'DiplomaCompressorCApi_createMatAndFill')
+      .asFunction<createMatAndFill_t>();
 
-    final getMatParams_t getMatParams = dylib
-        .lookup<ffi.NativeFunction<getMatParamsSignature>>(
-            'DiplomaCompressorCApi_getMatParams')
-        .asFunction<getMatParams_t>();
+  late final getMatParams_t _getMatParams = _dylib
+      .lookup<ffi.NativeFunction<getMatParamsSignature>>(
+          'DiplomaCompressorCApi_getMatParams')
+      .asFunction<getMatParams_t>();
 
-    final imshow_t imshow = dylib
-        .lookup<ffi.NativeFunction<imshowSignature>>(
-            'DiplomaCompressorCApi_imshow')
-        .asFunction<imshow_t>();
+  late final imshow_t _imshow = _dylib
+      .lookup<ffi.NativeFunction<imshowSignature>>(
+          'DiplomaCompressorCApi_imshow')
+      .asFunction<imshow_t>();
 
-    final destroyMat_t destroyMat = dylib
-        .lookup<ffi.NativeFunction<destroyMatSignature>>(
-            'DiplomaCompressorCApi_destroyMat')
-        .asFunction<destroyMat_t>();
-    final createSerializedData_t createSerializedData = dylib
-        .lookup<ffi.NativeFunction<createSerializedDataSignature>>(
-            'DiplomaCompressorCApi_createSerializedData')
-        .asFunction<createSerializedData_t>();
+  late final destroyMat_t _destroyMat = _dylib
+      .lookup<ffi.NativeFunction<destroyMatSignature>>(
+          'DiplomaCompressorCApi_destroyMat')
+      .asFunction<destroyMat_t>();
+  late final createSerializedData_t _createSerializedData = _dylib
+      .lookup<ffi.NativeFunction<createSerializedDataSignature>>(
+          'DiplomaCompressorCApi_createSerializedData')
+      .asFunction<createSerializedData_t>();
 
-    final destroySerializedData_t destroySerializedData = dylib
-        .lookup<ffi.NativeFunction<destroySerializedDataSignature>>(
-            'DiplomaCompressorCApi_destroySerializedData')
-        .asFunction<destroySerializedData_t>();
+  late final destroySerializedData_t _destroySerializedData = _dylib
+      .lookup<ffi.NativeFunction<destroySerializedDataSignature>>(
+          'DiplomaCompressorCApi_destroySerializedData')
+      .asFunction<destroySerializedData_t>();
 
-    final deCompress_t deCompress = dylib
-        .lookup<ffi.NativeFunction<deCompressSignature>>(
-            'DiplomaCompressorCApi_deCompress')
-        .asFunction<deCompress_t>();
+  late final deCompress_t _deCompress = _dylib
+      .lookup<ffi.NativeFunction<deCompressSignature>>(
+          'DiplomaCompressorCApi_deCompress')
+      .asFunction<deCompress_t>();
 
-    final compress_t compress = dylib
-        .lookup<ffi.NativeFunction<compressSignature>>(
-            'DiplomaCompressorCApi_compress')
-        .asFunction<compress_t>();
-    final getMatData_t getMatData = dylib
-        .lookup<ffi.NativeFunction<getMatDataSignature>>(
-            'DiplomaCompressorCApi_getMatData')
-        .asFunction<getMatData_t>();
-    // List<int> list = [];
-    // for (int i = 0; i < 500 * 500; ++i) {
-    //   list.add(255);
-    //   list.add(0);
-    //   list.add(0);
-    // }
+  late final compress_t _compress = _dylib
+      .lookup<ffi.NativeFunction<compressSignature>>(
+          'DiplomaCompressorCApi_compress')
+      .asFunction<compress_t>();
+  late final getMatData_t _getMatData = _dylib
+      .lookup<ffi.NativeFunction<getMatDataSignature>>(
+          'DiplomaCompressorCApi_getMatData')
+      .asFunction<getMatData_t>();
 
-    // String imagepath =
+  late final getDataFromSerializedData_t _getDataFromSerializedData = _dylib
+      .lookup<ffi.NativeFunction<getDataFromSerializedDataSignature>>(
+          'DiplomaCompressorCApi_getDataFromSerializedData')
+      .asFunction<getDataFromSerializedData_t>();
 
-    //     "C:\\Users\\ADMIN\\Downloads\\d8807dc1-2922-42ca-8aa7-ae91f4c4fdd9.png";
+  late final sizeOfSerializedData_t _sizeOfSerializedData = _dylib
+      .lookup<ffi.NativeFunction<sizeOfSerializedDataSignature>>(
+          'DiplomaCompressorCApi_sizeOfSerializedData')
+      .asFunction<sizeOfSerializedData_t>();
 
-    img.Image? image = img.decodeImage(File(imagePath).readAsBytesSync());
-    if (image != null) {
-      const backwards = 'Before compression';
-      final backwardsUtf8 = backwards.toNativeUtf8();
-      const backwards2 = 'After decompression';
-      final backwardsUtf82 = backwards2.toNativeUtf8();
+  Uint8List? compressImage(img.Image? image, int m, int n, int p) {
+    if (image == null) return null;
+    Uint8List pixelsRawList =
+        Uint8List(image.width * image.height * image.numChannels);
+    for (var pixel in image) {
+      int index = pixel.x * image.numChannels +
+          image.width * image.numChannels * pixel.y;
+      pixelsRawList[index + 2] = pixel.r.toInt();
+      pixelsRawList[index + 1] = pixel.g.toInt();
+      pixelsRawList[index + 0] = pixel.b.toInt();
+    }
 
-      image = image.convert(numChannels: 3);
+    var rawNative = _uint8ListToArray(pixelsRawList);
 
-      Uint8List pixelsRawList =
-          Uint8List(image.width * image.height * image.numChannels);
-      for (var pixel in image) {
-        int index = pixel.x * image.numChannels +
-            image.width * image.numChannels * pixel.y;
-        pixelsRawList[index + 2] = pixel.r.toInt();
-        pixelsRawList[index + 1] = pixel.g.toInt();
-        pixelsRawList[index + 0] = pixel.b.toInt();
+    var matImg = _createMatAndFill(
+        image.width, image.height, image.numChannels, rawNative.address);
+    calloc.free(rawNative);
+
+    //imshow(backwardsUtf8, matImg);
+
+    var compressedData = _compress(matImg, m, n, p);
+
+    Uint8List? data;
+    {
+      int serialziedDataSize = _sizeOfSerializedData(compressedData);
+      ffi.Pointer<ffi.Int8> serialziedDataPtr = malloc
+          .allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * serialziedDataSize);
+      _getDataFromSerializedData(compressedData, serialziedDataPtr.address);
+      data = Uint8List(serialziedDataSize);
+      for (int i = 0; i < serialziedDataSize; ++i) {
+        data[i] = serialziedDataPtr.elementAt(i).value;
       }
+      malloc.free(serialziedDataPtr);
+    }
 
-      var rawNative = uint8ListToArray(pixelsRawList);
+    _destroySerializedData(compressedData);
+    _destroyMat(matImg);
 
-      var matImg = createMatAndFill(
-          image.width, image.height, image.numChannels, rawNative.address);
-      calloc.free(rawNative);
+    return data;
+  }
 
-      imshow(backwardsUtf8, matImg);
+  img.Image? decompressImage(Uint8List? input) {
+    if (input == null) return null;
+    var data = _uint8ListToArray(input);
+    var compressedData = _createSerializedData(input.length, data.address);
+    var matImg = _deCompress(compressedData);
+    malloc.free(data);
 
-      var compressedData = compress(matImg, 8, 8, 37);
-      destroyMat(matImg);
-      matImg = 0;
+    ffi.Pointer<ffi.Int32> colsPtr =
+        malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+    ffi.Pointer<ffi.Int32> rowsPtr =
+        malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
 
-      matImg = deCompress(compressedData);
+    ffi.Pointer<ffi.Int32> channelsPtr =
+        malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
 
-      //createMatAndFill(500, 500, 3, intListToArray(list).address);
-      ffi.Pointer<ffi.Int32> colsPtr =
-          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
-      ffi.Pointer<ffi.Int32> rowsPtr =
-          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+    ffi.Pointer<ffi.Int32> dataSizePtr =
+        malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
 
-      ffi.Pointer<ffi.Int32> channelsPtr =
-          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
+    _getMatParams(matImg, colsPtr.address, rowsPtr.address, channelsPtr.address,
+        dataSizePtr.address);
 
-      ffi.Pointer<ffi.Int32> dataSizePtr =
-          malloc.allocate<ffi.Int32>(ffi.sizeOf<ffi.Int32>());
-      {
-        getMatParams(matImg, colsPtr.address, rowsPtr.address,
-            channelsPtr.address, dataSizePtr.address);
+    int cols = colsPtr.value;
+    int rows = rowsPtr.value;
+    int channels = channelsPtr.value;
+    int dataSize = dataSizePtr.value;
 
-        int cols = colsPtr.value;
-        int rows = rowsPtr.value;
-        int channels = channelsPtr.value;
-        int dataSize = dataSizePtr.value;
+    malloc.free(colsPtr);
+    malloc.free(rowsPtr);
+    malloc.free(channelsPtr);
+    malloc.free(dataSizePtr);
 
-        malloc.free(colsPtr);
-        malloc.free(rowsPtr);
-        malloc.free(channelsPtr);
-        malloc.free(dataSizePtr);
+    ffi.Pointer<ffi.Int8> imgDataPtr =
+        malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * dataSize);
 
-        ffi.Pointer<ffi.Int8> imgDataPtr =
-            malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * dataSize);
-        getMatData(matImg, imgDataPtr.address);
+    _getMatData(matImg, imgDataPtr.address);
 
-        img.Image image =
-            img.Image(height: rows, width: cols, numChannels: channels);
-        for (int y = 0; y < rows; ++y) {
-          for (int x = 0; x < cols; ++x) {
-            img.Color c = img.ColorInt8(channels);
-            for (int i = 0; i < channels; ++i) {
-              c[i] = imgDataPtr
-                  .elementAt(y * (cols * channels) + (x * channels) + i)
-                  .value;
-            }
-            image.setPixel(x, y, c);
-          }
+    img.Image image =
+        img.Image(height: rows, width: cols, numChannels: channels);
+    for (int y = 0; y < rows; ++y) {
+      for (int x = 0; x < cols; ++x) {
+        img.Color c = img.ColorInt8(channels);
+        for (int i = 0; i < channels; ++i) {
+          c[i] = imgDataPtr
+              .elementAt(
+                  y * (cols * channels) + (x * channels) + (channels - 1 - i))
+              .value;
         }
-        malloc.free(imgDataPtr);
-        img.PngEncoder encoder = img.PngEncoder();
-        Uint8List pngBytes = encoder.encode(image);
-        File f = File("C:/Users/ADMIN/Desktop/testing/out.png");
-        f.writeAsBytes(pngBytes);
+        image.setPixel(x, y, c);
       }
-      imshow(backwardsUtf82, matImg);
-
-      destroySerializedData(compressedData);
-
-      calloc.free(backwardsUtf8);
-      calloc.free(backwardsUtf82);
-      destroyMat(matImg);
-    } else {
-      print(" img.decodeImage = null");
     }
+    malloc.free(imgDataPtr);
+    _destroyMat(matImg);
+    _destroySerializedData(compressedData);
+    return image;
   }
 
-  ffi.Pointer<ffi.Int8> intListToArray(List<int> list) {
-    final ptr = malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * list.length);
-    for (var i = 0; i < list.length; i++) {
-      ptr.elementAt(i).value = list[i];
-    }
-    return ptr;
-  }
+  DiplomaCAPI();
 
-  ffi.Pointer<ffi.Int8> uint8ListToArray(Uint8List list) {
+  // ffi.Pointer<ffi.Int8> _intListToArray(List<int> list) {
+  //   final ptr = malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * list.length);
+  //   for (var i = 0; i < list.length; i++) {
+  //     ptr.elementAt(i).value = list[i];
+  //   }
+  //   return ptr;
+  // }
+
+  ffi.Pointer<ffi.Int8> _uint8ListToArray(Uint8List list) {
     final ptr = malloc.allocate<ffi.Int8>(ffi.sizeOf<ffi.Int8>() * list.length);
     for (var i = 0; i < list.length; i++) {
       ptr.elementAt(i).value = list[i];
@@ -251,7 +262,6 @@ class DiplomaCAPI {
 // __declspec(dllexport) SerializedData DiplomaCompressorCApi_compress(ApiMat MatPtr,int m,int n,int p);
 // __declspec(dllexport) ApiMat DiplomaCompressorCApi_deCompress(SerializedData serializedData);
 
-// __declspec(dllexport) int DiplomaCompressorCApi_sizeOfSerializedData(SerializedData);
 // __declspec(dllexport) SerializedData DiplomaCompressorCApi_createSerializedData(int size, char* data);
 // __declspec(dllexport) SerializedData DiplomaCompressorCApi_createEmptySerializedData();
 // __declspec(dllexport) void DiplomaCompressorCApi_getDataFromSerializedData(SerializedData serializedData,char* data);

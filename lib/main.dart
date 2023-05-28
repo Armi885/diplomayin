@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -8,19 +9,36 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:dotted_border/dotted_border.dart';
-
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import 'DiplomaCAPI.dart';
 import 'image_isolate.dart';
 
+import 'package:image/image.dart' as img;
+
 void main() {
-  // DiplomaCAPI f = DiplomaCAPI();
-  runApp(MyApp());
+  DiplomaCAPI api = DiplomaCAPI(); //     ;
+
+  img.Image? image = img.decodeImage(File(
+          "C:\\Users\\ADMIN\\Downloads\\d8807dc1-2922-42ca-8aa7-ae91f4c4fdd9.png")
+      .readAsBytesSync());
+  var data = api.compressImage(image, 8, 8, 37);
+  img.Image? imageDecompressed = api.decompressImage(data);
+  img.PngEncoder encoder = img.PngEncoder();
+  if (imageDecompressed == null) return;
+  Uint8List pngBytes = encoder.encode(imageDecompressed);
+  File f = File("C:/Users/ADMIN/Desktop/testing/out123.png");
+  f.writeAsBytes(pngBytes);
+  return;
+  //runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Desktop Drop Example',
       home: MyHomePage(),
     );
@@ -28,6 +46,8 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
+
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
@@ -37,15 +57,88 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Color _backgroundColor = const Color.fromRGBO(248, 249, 252, 1);
   bool isShow = false;
+  bool isDownload = false;
+
+  Uint8List? imageBytes;
 
   String? _selectedOption;
   @override
   void initState() {
     super.initState();
+
     _selectedOption = 'High Quality (Recommend)';
+    DiplomCAPI.response.listen((message) {
+      if (message is Uint8List) {
+        Navigator.of(context).pop();
+        setState(() {
+          imageBytes = message;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   bool _dragging = false;
+  void _onLoading() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(250),
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              children: [
+                const Text("Please wait while your file is being processed",
+                    style: TextStyle(
+                        color: Color.fromRGBO(120, 120, 120, 1), fontSize: 16)),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: Center(
+                        child: LoadingAnimationWidget.fourRotatingDots(
+                          color: const Color.fromRGBO(73, 126, 126, 1),
+                          size: 50,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    const Text("Loading...",
+                        style: TextStyle(
+                            color: Color.fromRGBO(31, 31, 31, 1),
+                            fontSize: 16)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                    "Unitl the conversion process has been finished, you have the following options:",
+                    style: TextStyle(
+                        color: Color.fromRGBO(31, 31, 31, 1), fontSize: 16)),
+                const Text(
+                    "Just wait, the page will update the conversion status automatically.",
+                    style: TextStyle(
+                        color: Color.fromRGBO(120, 120, 120, 1), fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    // new Future.delayed(new Duration(seconds: 3), () {
+    //   Navigator.pop(context); //pop dialog
+
+    // });
+  }
 
   List<XFile> _imageFiles = [];
 
@@ -97,7 +190,9 @@ class _MyHomePageState extends State<MyHomePage> {
                               ],
                             ),
                             const Divider(),
-                            if (_imageFiles.isEmpty)
+                            if (imageBytes != null)
+                              _buildDecompress()
+                            else if (_imageFiles.isEmpty)
                               _buildDropTarget()
                             else
                               _buildCompressor(),
@@ -113,6 +208,73 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
           ),
         ));
+  }
+
+  Future<void> _selectLocation() async {
+    String? result = await FilePicker.platform.getDirectoryPath();
+    if (result != null) {
+      final File file = File('$result/image.png');
+      print('path:${file.path}');
+      file.writeAsBytesSync(imageBytes!.toList());
+    }
+  }
+
+  Row _buildDecompress() {
+    return Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(15.0),
+          child: Container(
+            color: const Color.fromRGBO(247, 249, 252, 1),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(5.0),
+              child: MouseRegion(
+                onEnter: (event) => _downloadImage(true),
+                onExit: (event) => _downloadImage(false),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      height: 120,
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Opacity(
+                          opacity: isDownload ? 0.7 : 1,
+                          child: Image.memory(
+                            imageBytes!,
+                            fit: BoxFit.fill,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (isDownload)
+                      Positioned(
+                        child: IconButton(
+                          icon: const Icon(Icons.download, size: 25),
+                          color: Colors.white,
+                          onPressed: () async {
+                            await _selectLocation();
+                            // Add your download functionality here
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Text(getUin8ListImageSize(
+          uint8ListImage: imageBytes!,
+        )),
+      ],
+    );
+  }
+
+  String getUin8ListImageSize({required Uint8List uint8ListImage}) {
+    double fileSizeInMB = uint8ListImage.lengthInBytes / (1024 * 1024);
+    return '${fileSizeInMB.toStringAsFixed(3)} MB';
   }
 
   Row _buildButtonsRow() {
@@ -173,7 +335,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return imageFile.name;
   }
 
-  String getImageFileSizeInMB(XFile imageFile) {
+  String getImageFileSizeInMB(imageFile) {
     int fileSizeInBytes = File(imageFile.path).lengthSync();
     double fileSizeInMB = fileSizeInBytes / (1024 * 1024);
     return '${fileSizeInMB.toStringAsFixed(3)}MB';
@@ -328,10 +490,11 @@ class _MyHomePageState extends State<MyHomePage> {
                             ),
                           ),
                           onPressed: () {
-                            // DiplomCAPI decompress =
-                            //     DiplomCAPI(imagePath: _imageFiles[0].path);
-                            DiplomaCAPI f =
-                                DiplomaCAPI(imagePath: _imageFiles[0].path);
+                            DiplomCAPI decompress =
+                                DiplomCAPI(imagePath: _imageFiles[0].path);
+                            _onLoading();
+                            // DiplomaCAPI f =
+                            //     DiplomaCAPI(imagePath: _imageFiles[0].path);
                             //    int a = f.uint8ListToArray(list);
                           },
                           child: const Padding(
@@ -372,6 +535,12 @@ class _MyHomePageState extends State<MyHomePage> {
   void _removeImage(bool isRemoved) {
     setState(() {
       isShow = isRemoved;
+    });
+  }
+
+  void _downloadImage(bool isRemoved) {
+    setState(() {
+      isDownload = isRemoved;
     });
   }
 
