@@ -1,34 +1,21 @@
-import 'dart:isolate';
 import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'package:desktop_drop/desktop_drop.dart';
-import 'package:cross_file/cross_file.dart';
+
+import 'package:cross_file/cross_file.dart' show XFile;
+
 import 'package:dotted_border/dotted_border.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
-import 'DiplomaCAPI.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'image_isolate.dart';
+import 'package:path/path.dart' as path;
 
 import 'package:image/image.dart' as img;
 
 void main() {
-  // DiplomaCAPI api = DiplomaCAPI();
-
-  // img.Image? image = img.decodeImage(File(
-  //         "C:\\Users\\ADMIN\\Downloads\\d8807dc1-2922-42ca-8aa7-ae91f4c4fdd9.png")
-  //     .readAsBytesSync());
-  // var data = api.compressImage(image, 8, 8, 37);
-  // img.Image? imageDecompressed = api.decompressImage(data);
-  // img.PngEncoder encoder = img.PngEncoder();
-  // if (imageDecompressed == null) return;
-  // Uint8List pngBytes = encoder.encode(imageDecompressed);
-  // File f = File("C:/Users/ADMIN/Desktop/testing/out123.png");
-  // f.writeAsBytes(pngBytes);
-  // return;
   runApp(const Diploma());
 }
 
@@ -53,10 +40,21 @@ class Compress extends StatefulWidget {
 }
 
 class _CompressState extends State<Compress> {
+  void openFileLocation(String filePath) async {
+    final uri = Uri.file(filePath);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      throw 'Could not launch $filePath';
+    }
+  }
+
+  File? _imageDecompressing;
   String imageDimensions = '';
 
   Color _backgroundColor = const Color.fromRGBO(248, 249, 252, 1);
   bool isShow = false;
+  bool isZoom = false;
   bool isDownload = false;
 
   String? _selectedOption;
@@ -197,9 +195,6 @@ class _CompressState extends State<Compress> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // const Text('Compressor',
-                        //     style: TextStyle(
-                        //         color: Color.fromRGBO(72, 72, 82, 1), fontSize: 14)),
                         ClipRect(
                           child: Card(
                             elevation: 4,
@@ -215,16 +210,41 @@ class _CompressState extends State<Compress> {
                                       const Text('Attach file'),
                                       IconButton(
                                           onPressed: () async {
-                                            final files = await FilePicker
-                                                .platform
-                                                .pickFiles(allowMultiple: true);
-                                            if (files == null) return;
-                                            for (var platformFile
-                                                in files.files) {
-                                              setState(() {
-                                                _imageFiles.add(
-                                                    XFile(platformFile.path!));
-                                              });
+                                            if (isCompressingMode) {
+                                              FilePickerResult? files =
+                                                  await FilePicker.platform
+                                                      .pickFiles(
+                                                          allowMultiple: true,
+                                                          type: FileType.image,
+                                                          lockParentWindow:
+                                                              true);
+                                              if (files == null) return;
+                                              for (var platformFile
+                                                  in files.files) {
+                                                setState(() {
+                                                  _imageFiles.add(XFile(
+                                                      platformFile.path!));
+                                                });
+                                              }
+                                            } else {
+                                              FilePickerResult? files =
+                                                  await FilePicker.platform
+                                                      .pickFiles(
+                                                          allowMultiple: true,
+                                                          type: FileType.custom,
+                                                          lockParentWindow:
+                                                              true,
+                                                          allowedExtensions: [
+                                                    "diplomaOut"
+                                                  ]);
+                                              if (files == null) return;
+                                              for (var platformFile
+                                                  in files.files) {
+                                                setState(() {
+                                                  _compressedFiles.add(XFile(
+                                                      platformFile.path!));
+                                                });
+                                              }
                                             }
                                           },
                                           icon: const Icon(
@@ -237,7 +257,8 @@ class _CompressState extends State<Compress> {
                                   if (_imageFiles.isEmpty)
                                     _buildDropTarget()
                                   else
-                                    _buildCompressor(),
+                                    _buildImageProcessingWidget(
+                                        isCompressingMode),
                                   const Divider(),
                                   _buildButtonsRow()
                                 ],
@@ -262,8 +283,6 @@ class _CompressState extends State<Compress> {
                   color: const Color.fromRGBO(228, 232, 240, 1),
                   borderRadius: BorderRadius.circular(10.0),
                 ),
-                //228,232,240
-
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(vertical: 5, horizontal: 3),
@@ -316,9 +335,6 @@ class _CompressState extends State<Compress> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // const Text('Compressor',
-                        //     style: TextStyle(
-                        //         color: Color.fromRGBO(72, 72, 82, 1), fontSize: 14)),
                         ClipRect(
                           child: Card(
                             elevation: 4,
@@ -357,7 +373,8 @@ class _CompressState extends State<Compress> {
                                   if (_compressedFiles.isEmpty)
                                     _buildDropTarget()
                                   else
-                                    _buildDeCompressor(),
+                                    _buildImageProcessingWidget(
+                                        isCompressingMode),
                                   const Divider(),
                                 ],
                               ),
@@ -373,15 +390,6 @@ class _CompressState extends State<Compress> {
           ));
     }
   }
-
-  // Future<void> _selectLocation() async {
-  //   String? result = await FilePicker.platform.getDirectoryPath();
-  //   if (result != null) {
-  //     final File file = File('$result/image.png');
-  //     print('path:${file.path}');
-  //     file.writeAsBytesSync(imageBytes!.toList());
-  //   }
-  // }
 
   String getUin8ListImageSize({required Uint8List uint8ListImage}) {
     double fileSizeInMB = uint8ListImage.lengthInBytes / (1024 * 1024);
@@ -447,24 +455,18 @@ class _CompressState extends State<Compress> {
   }
 
   Future<String> getImageFileSizeInMB(imageFile) async {
+    assert(imageFile != null);
     img.Image? decodedImageC = await img.decodeImageFile(imageFile);
 
     if (decodedImageC == null || decodedImageC.data == null) {
       return "";
     }
     return '${decodedImageC.data!.lengthInBytes / (1024 * 1024)}MB';
-
-    // int fileSizeInBytes = File(imageFile.path).lengthSync();
-    // double fileSizeInMB = fileSizeInBytes / (1024 * 1024);
-    //  return '${fileSizeInMB.toStringAsFixed(3)}MB';
   }
 
   Future<String> getFileSizeInMB(imageFile) async {
-    return '${File(imageFile).lengthSync() / (1024 * 1024)}MB';
-
-    // int fileSizeInBytes = File(imageFile.path).lengthSync();
-    // double fileSizeInMB = fileSizeInBytes / (1024 * 1024);
-    //  return '${fileSizeInMB.toStringAsFixed(3)}MB';
+    double fileSizeInMB = File(imageFile).lengthSync() / (1024 * 1024);
+    return '${fileSizeInMB.toStringAsFixed(3)} MB';
   }
 
   String getFileExtension(String fileName) {
@@ -502,6 +504,7 @@ class _CompressState extends State<Compress> {
       //print error message
       return;
     }
+
     String? result = await FilePicker.platform.saveFile(
         dialogTitle: "Please select output data path.",
         type: FileType.custom,
@@ -515,11 +518,15 @@ class _CompressState extends State<Compress> {
         return;
       }
       File(result).writeAsBytesSync(data);
+      setState(() {
+        _imageDecompressing = File(result!);
+      });
     }
+
     print("finished with $image");
   }
 
-  _buildCompressor() {
+  _buildImageProcessingWidget(bool isCompressor) {
     return MouseRegion(
       onEnter: (event) => _removeImage(true),
       onExit: (event) => _removeImage(false),
@@ -529,346 +536,341 @@ class _CompressState extends State<Compress> {
           color: const Color.fromRGBO(247, 249, 252, 1),
           child: Padding(
             padding: const EdgeInsets.all(12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(5.0),
-                  child: SizedBox(
-                    width: 120, // Set a specific width for the container
-                    height: 120,
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9, // Set the desired aspect ratio here
-
-                      child: Image.file(
-                        // height: 120,
-                        // width: 120,
-                        File(_imageFiles[0].path),
-                        fit: BoxFit.fill,
+            child: _imageDecompressing != null
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      MouseRegion(
+                        onEnter: (event) => _zoomImage(true),
+                        onExit: (event) => _zoomImage(false),
+                        child: Stack(
+                          children: [
+                            ColorFiltered(
+                              colorFilter: ColorFilter.mode(
+                                  Colors.black26.withOpacity(isZoom ? 0.4 : 0),
+                                  BlendMode.srcOver),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(5.0),
+                                child: SizedBox(
+                                  width:
+                                      120, // Set a specific width for the container
+                                  height: 120,
+                                  child: AspectRatio(
+                                    aspectRatio: 16 /
+                                        9, // Set the desired aspect ratio here
+                                    child: Image.file(
+                                      _imageDecompressing!,
+                                      fit: BoxFit.fill,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (isZoom)
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                left: 0,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    openFileLocation(_imageDecompressing!.path);
+                                  },
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: const [
+                                      Icon(
+                                        Icons.search,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
+                                      Text('Open Image',
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 18.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              path.basename(_imageDecompressing!.path),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 28.0),
+                              child: Row(
+                                children: [
+                                  Image.file(
+                                    File(
+                                        'C://Users//ADMIN//Downloads//resolution.png'),
+                                    width: 20,
+                                    height: 20,
+                                    fit: BoxFit.fill,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(_getImageDimensions(
+                                      filePath: _imageDecompressing!.path)),
+                                ],
+                              ),
+                            ),
+                            // IconButton(
+                            //   icon: const Icon(Icons.folder),
+                            //   onPressed: () async {
+                            //     openFileLocation(imageDecompressing!.path);
+                            //   },
+                            // )
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.topRight,
+                          child: InkWell(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return informationDialog(isCompressingMode);
+                                },
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: const InkResponse(
+                              containedInkWell: true,
+                              child: Icon(Icons.close, color: Colors.grey),
+                            ),
+                          ),
+                        ),
+                      )
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isCompressor)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(5.0),
+                          child: SizedBox(
+                            width:
+                                120, // Set a specific width for the container
+                            height: 120,
+                            child: AspectRatio(
+                              aspectRatio:
+                                  16 / 9, // Set the desired aspect ratio here
+                              child: Image.file(
+                                File(isCompressor
+                                    ? _imageFiles[0].path
+                                    : _compressedFiles[0].path),
+                                fit: BoxFit.fill,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(5.0),
+                          child: SizedBox(
+                              width:
+                                  120, // Set a specific width for the container
+                              height: 120,
+                              child: Container(
+                                //240,243,250
+                                color: const Color.fromRGBO(240, 243, 250, 1),
+                                child: Image.file(
+                                  File('C://Users//ADMIN//Documents//doc.png'),
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.fill,
+                                ),
+                              )),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              getImageName(
+                                isCompressor
+                                    ? _imageFiles[0]
+                                    : _compressedFiles[0],
+                              ),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            DottedBorder(
+                              borderType: BorderType.RRect,
+                              dashPattern: const [6, 3, 2, 3],
+                              color: const Color.fromRGBO(224, 229, 238, 1),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10.0,
+                                  horizontal: 8,
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.folder,
+                                          color:
+                                              Color.fromRGBO(73, 126, 126, 1),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        FutureBuilder(
+                                          future: isCompressor
+                                              ? getImageFileSizeInMB(
+                                                  _imageFiles[0].path)
+                                              : getFileSizeInMB(
+                                                  _compressedFiles[0].path),
+                                          builder: (context, snapshot) {
+                                            if (snapshot.hasData) {
+                                              return Text(
+                                                snapshot.data!,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w500,
+                                                  fontSize: 16,
+                                                ),
+                                              );
+                                            }
+                                            return Container();
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                    if (isCompressor)
+                                      Row(
+                                        children: [
+                                          const CircleAvatar(
+                                            radius: 2,
+                                            backgroundColor: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(getFileExtension(
+                                              _imageFiles[0].name)),
+                                          const SizedBox(width: 20),
+                                          const CircleAvatar(
+                                            radius: 2,
+                                            backgroundColor: Colors.grey,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(_getImageDimensions(
+                                              filePath: _imageFiles[0].path)),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (isShow)
+                            Align(
+                              alignment: Alignment.topRight,
+                              child: InkWell(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (BuildContext context) {
+                                      return informationDialog(
+                                          isCompressingMode);
+                                    },
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(20),
+                                child: const InkResponse(
+                                  containedInkWell: true,
+                                  child: Icon(Icons.close, color: Colors.grey),
+                                ),
+                              ),
+                            )
+                          else
+                            Container(),
+                          Padding(
+                            padding: isShow
+                                ? EdgeInsets.zero
+                                : const EdgeInsets.only(top: 25.0),
+                            child: Center(
+                              child: ElevatedButton(
+                                style: ButtonStyle(
+                                  backgroundColor:
+                                      MaterialStateProperty.all<Color>(
+                                    const Color.fromRGBO(73, 126, 126, 1),
+                                  ),
+                                  shape: MaterialStateProperty.all<
+                                      RoundedRectangleBorder>(
+                                    RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10.0),
+                                    ),
+                                  ),
+                                ),
+                                onPressed: () {
+                                  _onLoading();
+                                  if (isCompressor) {
+                                    img.Image? image = img.decodeImage(
+                                      File(_imageFiles[0].path)
+                                          .readAsBytesSync(),
+                                    );
+                                    if (image != null) {
+                                      runCompressionIsolate(image)
+                                          .then((value) => {
+                                                compressionFinished(value),
+                                              })
+                                          .onError((error, stackTrace) => {});
+                                    }
+                                  } else {
+                                    var data = File(_compressedFiles[0].path)
+                                        .readAsBytesSync();
+                                    runDecompressionIsolate(data)
+                                        .then((value) => {
+                                              deCompressionFinished(value),
+                                            })
+                                        .onError((error, stackTrace) => {});
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Text(
+                                      isCompressor ? 'Compress' : 'Decompress'),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            getImageName(
-                              _imageFiles[0],
-                            ),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500, fontSize: 16)),
-                        const SizedBox(height: 20),
-                        DottedBorder(
-                          borderType: BorderType.RRect,
-                          // radius: const Radius.circular(12),
-                          dashPattern: const [6, 3, 2, 3],
-                          //224,229,238
-                          color: const Color.fromRGBO(224, 229, 238, 1),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 10.0, horizontal: 8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.folder,
-                                      color: Color.fromRGBO(73, 126, 126, 1),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    FutureBuilder(
-                                        future: getImageFileSizeInMB(
-                                          _imageFiles[0].path,
-                                        ),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasData) {
-                                            return Text(snapshot.data!,
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 16));
-                                          }
-                                          return Container();
-                                        }),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 2,
-                                      backgroundColor: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(getFileExtension(_imageFiles[0].name)),
-                                    const SizedBox(width: 20),
-                                    const CircleAvatar(
-                                      radius: 2,
-                                      backgroundColor: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(_getImageDimensions()),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ]),
-                ),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isShow)
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: InkWell(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return MyAlertDialog();
-                              },
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: const InkResponse(
-                              containedInkWell: true,
-                              child: Icon(Icons.close, color: Colors.grey)),
-                        ),
-                      )
-                    else
-                      Container(),
-                    Padding(
-                      padding: isShow
-                          ? EdgeInsets.zero
-                          : const EdgeInsets.only(top: 25.0),
-                      child: Center(
-                        child: ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor: MaterialStateProperty.all<Color>(
-                                const Color.fromRGBO(73, 126, 126, 1)),
-                            shape: MaterialStateProperty.all<
-                                RoundedRectangleBorder>(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                    10.0), // Adjust the value as per your preference
-                              ),
-                            ),
-                          ),
-                          onPressed: () {
-                            //  _onLoading();
-                            // compressionFinished(Uint8List(5));
-
-                            //file picker
-                            _onLoading();
-                            img.Image? image = img.decodeImage(
-                                File(_imageFiles[0].path).readAsBytesSync());
-                            if (image != null) {
-                              runCompressionIsolate(image)
-                                  .then((value) => {compressionFinished(value)})
-                                  .onError((error, stackTrace) => {});
-                            }
-
-                            //   compress();
-                            // DiplomCAPI decompress =
-                            //     DiplomCAPI(imagePath: _imageFiles[0].path);
-                            //
-                            // DiplomaCAPI f =
-                            //     DiplomaCAPI(imagePath: _imageFiles[0].path);
-                            //    int a = f.uint8ListToArray(list);
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: Text('Compress'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ),
         ),
       ),
     );
   }
 
-  _buildDeCompressor() {
-    return MouseRegion(
-      onEnter: (event) => _removeImage(true),
-      onExit: (event) => _removeImage(false),
-      child: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: Container(
-          color: const Color.fromRGBO(247, 249, 252, 1),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            getImageName(
-                              _compressedFiles[0],
-                            ),
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w500, fontSize: 16)),
-                        const SizedBox(height: 20),
-                        DottedBorder(
-                          borderType: BorderType.RRect,
-                          // radius: const Radius.circular(12),
-                          dashPattern: const [6, 3, 2, 3],
-                          //224,229,238
-                          color: const Color.fromRGBO(224, 229, 238, 1),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 10.0, horizontal: 8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.start,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.folder,
-                                      color: Color.fromRGBO(73, 126, 126, 1),
-                                    ),
-                                    const SizedBox(width: 5),
-                                    FutureBuilder(
-                                        future: getFileSizeInMB(
-                                          _compressedFiles[0].path,
-                                        ),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.hasData) {
-                                            return Text(snapshot.data!,
-                                                style: const TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 16));
-                                          }
-                                          return Container();
-                                        }),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    const CircleAvatar(
-                                      radius: 2,
-                                      backgroundColor: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(getFileExtension(
-                                        _compressedFiles[0].name)),
-                                    const SizedBox(width: 20),
-                                    const CircleAvatar(
-                                      radius: 2,
-                                      backgroundColor: Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4)
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ]),
-                ),
-                const Spacer(),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (isShow)
-                      Align(
-                        alignment: Alignment.topRight,
-                        child: InkWell(
-                          onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (BuildContext context) {
-                                return MyAlertDialog();
-                              },
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: const InkResponse(
-                              containedInkWell: true,
-                              child: Icon(Icons.close, color: Colors.grey)),
-                        ),
-                      )
-                    else
-                      Container(),
-                    Padding(
-                      padding: isShow
-                          ? EdgeInsets.zero
-                          : const EdgeInsets.only(top: 25.0),
-                      child: Center(
-                        child: ElevatedButton(
-                          style: ButtonStyle(
-                            backgroundColor: MaterialStateProperty.all<Color>(
-                                const Color.fromRGBO(73, 126, 126, 1)),
-                            shape: MaterialStateProperty.all<
-                                RoundedRectangleBorder>(
-                              RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(
-                                    10.0), // Adjust the value as per your preference
-                              ),
-                            ),
-                          ),
-                          onPressed: () {
-                            //  _onLoading();
-                            // compressionFinished(Uint8List(5));
-
-                            //file picker
-                            _onLoading();
-                            var data = File(_compressedFiles[0].path)
-                                .readAsBytesSync();
-                            if (data != null) {
-                              runDecompressionIsolate(data)
-                                  .then(
-                                      (value) => {deCompressionFinished(value)})
-                                  .onError((error, stackTrace) => {});
-                            }
-
-                            //   compress();
-                            // DiplomCAPI decompress =
-                            //     DiplomCAPI(imagePath: _imageFiles[0].path);
-                            //
-                            // DiplomaCAPI f =
-                            //     DiplomaCAPI(imagePath: _imageFiles[0].path);
-                            //    int a = f.uint8ListToArray(list);
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.all(20.0),
-                            child: Text('Decompress'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getImageDimensions() {
-    File image = File(_imageFiles[0].path);
+  String _getImageDimensions({required String filePath}) {
+    File image = File(filePath);
     decodeImageFromList(image.readAsBytesSync()).then((value) {
       setState(() {
         imageDimensions = '${value.height} * ${value.width}';
@@ -891,13 +893,13 @@ class _CompressState extends State<Compress> {
     });
   }
 
-  void _downloadImage(bool isRemoved) {
+  void _zoomImage(bool isZoomed) {
     setState(() {
-      isDownload = isRemoved;
+      isZoom = isZoomed;
     });
   }
 
-  MyAlertDialog() {
+  informationDialog(bool isCompressor) {
     return AlertDialog(
       title: const Text('Information'),
       content: StatefulBuilder(
@@ -934,9 +936,16 @@ class _CompressState extends State<Compress> {
           ),
           child: const Text('Remove'),
           onPressed: () {
-            setState(() {
-              _imageFiles = [];
-            });
+            if (isCompressor) {
+              setState(() {
+                _imageFiles = [];
+              });
+            } else {
+              setState(() {
+                _compressedFiles = [];
+              });
+            }
+
             // Perform submit action
             Navigator.of(context).pop();
           },
@@ -1012,17 +1021,17 @@ class _CompressState extends State<Compress> {
                       color: _dragging
                           ? Colors.blue.withOpacity(0.4)
                           : _backgroundColor,
-
-                      // const Color.fromRGBO(248, 249, 252, 1),
                       child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.cloud_download,
                                 size: 64,
                                 color: Color.fromRGBO(73, 126, 126, 1)),
-                            const Text(
-                                'Add or drag file here to start compression',
-                                style: TextStyle(
+                            Text(
+                                isCompressingMode
+                                    ? 'Add or drag file here to start compression'
+                                    : 'Add or drag file here to start decompression',
+                                style: const TextStyle(
                                     color: Color.fromRGBO(72, 72, 82, 1))),
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 8.0),
@@ -1031,18 +1040,20 @@ class _CompressState extends State<Compress> {
                             Padding(
                               padding: const EdgeInsets.only(left: 18.0),
                               child: Row(
-                                children: const [
-                                  Text('Step 1: Add ',
+                                children: [
+                                  const Text('Step 1: Add ',
                                       style: TextStyle(
                                           color:
                                               Color.fromRGBO(72, 72, 82, 1))),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.file_upload_outlined,
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.file_upload_outlined,
                                       color: Color.fromRGBO(73, 126, 126, 1)),
-                                  SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   Text(
-                                      'or drag file here to start compression.',
-                                      style: TextStyle(
+                                      isCompressingMode
+                                          ? 'or drag file  here to start compression.'
+                                          : 'or drag file here to start decompression.',
+                                      style: const TextStyle(
                                           color:
                                               Color.fromRGBO(72, 72, 82, 1))),
                                 ],
@@ -1052,9 +1063,12 @@ class _CompressState extends State<Compress> {
                             Padding(
                               padding: const EdgeInsets.only(left: 18.0),
                               child: Row(
-                                children: const [
-                                  Text('Step 2: Start compression.',
-                                      style: TextStyle(
+                                children: [
+                                  Text(
+                                      isCompressingMode
+                                          ? 'Step 2: Start compression.'
+                                          : 'Step 2: Start decompression.',
+                                      style: const TextStyle(
                                           color:
                                               Color.fromRGBO(72, 72, 82, 1))),
                                 ],

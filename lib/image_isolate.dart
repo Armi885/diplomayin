@@ -1,9 +1,6 @@
-import 'dart:ffi' as ffi;
-import 'dart:io' show Directory, File;
+import 'dart:io' show  File;
 import 'dart:isolate';
-import 'dart:typed_data';
-import 'package:ffi/ffi.dart';
-import 'package:path/path.dart' as path;
+
 import 'package:image/image.dart' as img;
 import 'package:flutter/foundation.dart';
 
